@@ -1,0 +1,48 @@
+[package]
+name = "anchor-periscope"
+version = "0.1.0"
+edition = "2021"
+description = "CLI tool to explore and query Anchor program IDLs on-chain"
+license = "MIT"
+repository = "https://github.com/Mctursh/Periscope"
+keywords = ["solana", "anchor", "idl", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "periscope"
+path = "src/lib.rs"
+
+[[bin]]
+name = "periscope"
+path = "src/main.rs"
+
+[dependencies]
+# error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# compression (Anchor IDL uses deflate/zlib compression on-chain)
+flate2 = "1.0"
+
+# http client (for fetching IDL from URL)
+reqwest = { version = "0.12", features = ["json"] }
+
+# async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# cli
+clap = { version = "4.0", features = ["derive"] }
+inquire = "0.7"
+colored = "2.0"
+
+# filesystem
+dirs = "5.0"
+
+# solana
+solana-sdk = "2.2"
+solana-client = "2.2"
