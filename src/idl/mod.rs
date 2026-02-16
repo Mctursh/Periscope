@@ -4,6 +4,7 @@
 //! and provides types for working with them.
 
 mod fetcher;
+mod legacy;
 mod types;
 
 pub use fetcher::*;

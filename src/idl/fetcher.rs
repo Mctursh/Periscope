@@ -2,6 +2,7 @@
 
 use crate::cli::IdlSource;
 use crate::error::{PeriscopeError, PeriscopeResult};
+use crate::idl::legacy::LegacyIdl;
 use crate::idl::Idl;
 use flate2::read::{DeflateDecoder, ZlibDecoder};
 use solana_client::rpc_client::RpcClient;
@@ -148,8 +149,10 @@ pub fn fetch_idl_with_client(client: &RpcClient, program_id: &Pubkey) -> Perisco
         ));
     }
 
-    // Step 9: Parse JSON into Idl struct
-    let idl: Idl = serde_json::from_slice(&json_bytes)?;
+    // Step 9: Parse JSON into Idl struct (auto-detects format)
+    let json_str = std::str::from_utf8(&json_bytes)
+        .map_err(|_| PeriscopeError::DecompressionError("Invalid UTF-8".to_string()))?;
+    let idl = parse_idl_json(json_str)?;
 
     Ok(idl)
 }
@@ -176,7 +179,7 @@ pub fn load_idl_from_file(path: &str) -> PeriscopeResult<Idl> {
     }
 
     let contents = std::fs::read_to_string(path)?;
-    let idl: Idl = serde_json::from_str(&contents)?;
+    let idl = parse_idl_json(&contents)?;
 
     Ok(idl)
 }
@@ -230,8 +233,8 @@ pub async fn fetch_idl_from_url(url: &str) -> PeriscopeResult<Idl> {
         .await
         .map_err(|e| PeriscopeError::NetworkError(format!("Failed to read response body: {}", e)))?;
 
-    // Parse JSON
-    let idl: Idl = serde_json::from_str(&body)?;
+    // Parse JSON (auto-detects format)
+    let idl = parse_idl_json(&body)?;
 
     Ok(idl)
 }
@@ -239,6 +242,53 @@ pub async fn fetch_idl_from_url(url: &str) -> PeriscopeResult<Idl> {
 // ============================================================================
 // Helper functions
 // ============================================================================
+
+/// Parse IDL JSON, auto-detecting format (new 0.1.0 spec vs legacy)
+///
+/// Detection logic:
+/// - New format: `address` is a string at ROOT level
+/// - Legacy format: `address` is absent or inside `metadata`
+///
+/// This is reliable because:
+/// - New (0.1.0): `{ "address": "...", "metadata": { "name": "..." } }`
+/// - Legacy: `{ "name": "...", "metadata": { "address": "..." } }`
+fn parse_idl_json(json_str: &str) -> PeriscopeResult<Idl> {
+    // First, parse as generic JSON to detect format
+    let value: serde_json::Value = serde_json::from_str(json_str)?;
+
+    // Key differentiator: "address" as a string at ROOT level = new format
+    let is_new_format = value
+        .get("address")
+        .map(|v| v.is_string())
+        .unwrap_or(false);
+
+    if is_new_format {
+        // New format (0.1.0 spec) - address at root
+        return serde_json::from_str(json_str).map_err(PeriscopeError::ParseError);
+    }
+
+    // Legacy format - try to parse and convert
+    // Legacy has "name" at root level, address (if any) is inside metadata
+    if value.get("name").is_some() {
+        if let Ok(legacy) = serde_json::from_str::<LegacyIdl>(json_str) {
+            return Ok(legacy.into());
+        }
+    }
+
+    // Fallback: try both parsers and return first success
+    if let Ok(idl) = serde_json::from_str::<Idl>(json_str) {
+        return Ok(idl);
+    }
+
+    if let Ok(legacy) = serde_json::from_str::<LegacyIdl>(json_str) {
+        return Ok(legacy.into());
+    }
+
+    // If all else fails, return the new format parse error (more common)
+    Err(PeriscopeError::ParseError(
+        serde_json::from_str::<Idl>(json_str).unwrap_err(),
+    ))
+}
 
 /// Derive the IDL account address for a program
 ///
