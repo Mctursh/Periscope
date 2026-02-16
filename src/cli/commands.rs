@@ -36,7 +36,6 @@ pub enum IdlSource {
     Url(String),
 }
 
-
 /// Convert GitHub blob URLs to raw.githubusercontent.com URLs
 fn normalize_github_url(url: &str) -> String {
     if url.contains("github.com") && url.contains("/blob/") {

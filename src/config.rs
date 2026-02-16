@@ -41,7 +41,9 @@ impl Config {
     pub fn dir_path() -> PeriscopeResult<PathBuf> {
         dirs::config_dir()
             .map(|p| p.join(CONFIG_DIR))
-            .ok_or_else(|| PeriscopeError::ConfigError("Could not determine config directory".into()))
+            .ok_or_else(|| {
+                PeriscopeError::ConfigError("Could not determine config directory".into())
+            })
     }
 
     /// Get the config file path (~/.config/periscope/config.toml)
@@ -64,14 +66,12 @@ impl Config {
 
         let contents = fs::read_to_string(&path).map_err(PeriscopeError::IoError)?;
 
-        // Handle empty file
         if contents.trim().is_empty() {
             return Ok(Self::default());
         }
 
-        let config: Config = toml::from_str(&contents).map_err(|e| {
-            PeriscopeError::ConfigError(format!("Failed to parse config: {}", e))
-        })?;
+        let config: Config = toml::from_str(&contents)
+            .map_err(|e| PeriscopeError::ConfigError(format!("Failed to parse config: {}", e)))?;
 
         Ok(config)
     }
@@ -81,17 +81,14 @@ impl Config {
         let dir = Self::dir_path()?;
         let path = Self::file_path()?;
 
-        // Create config directory if it doesn't exist
         if !dir.exists() {
             fs::create_dir_all(&dir).map_err(PeriscopeError::IoError)?;
         }
 
-        // Serialize to TOML
         let contents = toml::to_string_pretty(self).map_err(|e| {
             PeriscopeError::ConfigError(format!("Failed to serialize config: {}", e))
         })?;
 
-        // Write to file
         fs::write(&path, contents).map_err(PeriscopeError::IoError)?;
 
         Ok(())
@@ -99,7 +96,6 @@ impl Config {
 
     /// Validate the config values
     pub fn validate(&self) -> PeriscopeResult<()> {
-        // Validate RPC URL format
         if !self.rpc_url.starts_with("http://") && !self.rpc_url.starts_with("https://") {
             return Err(PeriscopeError::ConfigError(
                 "RPC URL must start with http:// or https://".into(),

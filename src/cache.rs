@@ -14,7 +14,9 @@ pub struct IdlCache;
 impl IdlCache {
     /// Get the cache directory path (~/.config/periscope/cache/)
     pub fn cache_dir() -> Option<PathBuf> {
-        crate::config::Config::dir_path().ok().map(|p| p.join(CACHE_DIR))
+        crate::config::Config::dir_path()
+            .ok()
+            .map(|p| p.join(CACHE_DIR))
     }
 
     /// Get cached IDL for a program, if it exists

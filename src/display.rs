@@ -1,14 +1,7 @@
 //! Pretty-print helpers for CLI output
 
+use crate::idl::{Idl, IdlAccount, IdlAccountItem, IdlInstruction, IdlType, IdlTypeComplex};
 use colored::Colorize;
-use crate::idl::{
-    Idl, IdlInstruction, IdlAccount, IdlAccountItem,
-    IdlType, IdlTypeComplex,
-};
-
-// ============================================================================
-// Section headers and formatting
-// ============================================================================
 
 /// Print a main header (program name, command title)
 pub fn print_header(title: &str) {
@@ -38,10 +31,6 @@ pub fn print_list_item(text: &str) {
     println!("    {}", text);
 }
 
-// ============================================================================
-// IDL Overview (inspect command)
-// ============================================================================
-
 /// Display full IDL overview
 pub fn display_idl_overview(idl: &Idl) {
     print_header(&format!("Program: {}", idl.metadata.name));
@@ -66,10 +55,6 @@ pub fn display_idl_overview(idl: &Idl) {
     println!();
 }
 
-// ============================================================================
-// Instructions list (instructions command)
-// ============================================================================
-
 /// Display list of all instructions
 pub fn display_instructions_list(idl: &Idl) {
     print_header(&format!(
@@ -88,28 +73,27 @@ pub fn display_instructions_list(idl: &Idl) {
     println!();
 }
 
-// ============================================================================
-// Single instruction detail (instruction command)
-// ============================================================================
-
 /// Display detailed info for a single instruction
 pub fn display_instruction_detail(instruction: &IdlInstruction) {
     print_header(&format!("Instruction: {}", instruction.name.green()));
 
-    // Discriminator
     if !instruction.discriminator.is_empty() {
-        print_field("Discriminator", &format_discriminator(&instruction.discriminator));
+        print_field(
+            "Discriminator",
+            &format_discriminator(&instruction.discriminator),
+        );
     }
 
-    // Accounts
-    print_subheader(&format!("Accounts ({})", count_accounts(&instruction.accounts)));
+    print_subheader(&format!(
+        "Accounts ({})",
+        count_accounts(&instruction.accounts)
+    ));
     if instruction.accounts.is_empty() {
         println!("  {}", "(none)".dimmed());
     } else {
         display_account_items(&instruction.accounts, 1, 0);
     }
 
-    // Arguments
     print_subheader(&format!("Arguments ({})", instruction.args.len()));
     if instruction.args.is_empty() {
         println!("  {}", "(none)".dimmed());
@@ -203,10 +187,6 @@ fn format_account_extra(account: &IdlAccount) -> String {
     }
 }
 
-// ============================================================================
-// Errors list (errors command)
-// ============================================================================
-
 /// Display list of all errors
 pub fn display_errors_list(idl: &Idl) {
     print_header(&format!(
@@ -218,14 +198,18 @@ pub fn display_errors_list(idl: &Idl) {
     if idl.errors.is_empty() {
         println!("  {}", "(none)".dimmed());
     } else {
-        // Header row
         println!(
             "  {}  {}  {}",
             format!("{:<6}", "Code").dimmed(),
             format!("{:<24}", "Name").dimmed(),
             "Message".dimmed()
         );
-        println!("  {}  {}  {}", "─".repeat(6), "─".repeat(24), "─".repeat(30));
+        println!(
+            "  {}  {}  {}",
+            "─".repeat(6),
+            "─".repeat(24),
+            "─".repeat(30)
+        );
 
         for error in &idl.errors {
             let msg = error.msg.as_deref().unwrap_or("-");
@@ -239,10 +223,6 @@ pub fn display_errors_list(idl: &Idl) {
     }
     println!();
 }
-
-// ============================================================================
-// Type formatting helpers
-// ============================================================================
 
 /// Format IdlType as readable string
 pub fn format_type(ty: &IdlType) -> String {
@@ -272,10 +252,6 @@ pub fn format_discriminator(bytes: &[u8]) -> String {
     }
 }
 
-// ============================================================================
-// Error display
-// ============================================================================
-
 /// Display an error message
 pub fn display_error(msg: &str) {
     eprintln!("{} {}", "Error:".red().bold(), msg);
@@ -292,7 +268,10 @@ pub fn display_instruction_not_found(name: &str, available: &[&str]) {
             eprintln!("  - {}", ix_name.green());
         }
         if available.len() > 10 {
-            eprintln!("  {} more...", format!("(+{})", available.len() - 10).dimmed());
+            eprintln!(
+                "  {} more...",
+                format!("(+{})", available.len() - 10).dimmed()
+            );
         }
     }
 }

@@ -11,10 +11,6 @@ use super::types::{
     IdlTypeDefTy,
 };
 
-// ============================================================================
-// Legacy Root Structure
-// ============================================================================
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct LegacyIdl {
     /// Program name (at root level in legacy)
@@ -66,10 +62,6 @@ pub struct LegacyMetadata {
     pub lib_version: Option<String>,
 }
 
-// ============================================================================
-// Legacy Instruction
-// ============================================================================
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct LegacyInstruction {
     pub name: String,
@@ -103,10 +95,6 @@ pub struct LegacyInstructionAccount {
     #[serde(default)]
     pub docs: Vec<String>,
 }
-
-// ============================================================================
-// Legacy Types
-// ============================================================================
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LegacyTypeDef {
@@ -151,10 +139,6 @@ pub struct LegacyField {
     pub ty: LegacyType,
 }
 
-// ============================================================================
-// Legacy Type (the complex one)
-// ============================================================================
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum LegacyType {
@@ -181,10 +165,6 @@ pub enum LegacyTypeComplex {
     Defined(String),
 }
 
-// ============================================================================
-// Legacy Events
-// ============================================================================
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct LegacyEvent {
     pub name: String,
@@ -193,13 +173,8 @@ pub struct LegacyEvent {
     pub fields: Vec<LegacyField>,
 }
 
-// ============================================================================
-// Conversion: Legacy -> Canonical
-// ============================================================================
-
 impl From<LegacyIdl> for Idl {
     fn from(legacy: LegacyIdl) -> Self {
-        // Extract address from legacy metadata if present
         let address = legacy
             .metadata
             .as_ref()
@@ -215,20 +190,28 @@ impl From<LegacyIdl> for Idl {
                 description: None,
             },
             instructions: legacy.instructions.into_iter().map(Into::into).collect(),
-            accounts: legacy.accounts.iter().map(|a| IdlAccountRef {
-                name: a.name.clone(),
-                discriminator: vec![], // Legacy doesn't have discriminators
-            }).collect(),
+            accounts: legacy
+                .accounts
+                .iter()
+                .map(|a| IdlAccountRef {
+                    name: a.name.clone(),
+                    discriminator: vec![],
+                })
+                .collect(),
             types: legacy
                 .accounts
                 .into_iter()
                 .chain(legacy.types)
                 .map(Into::into)
                 .collect(),
-            events: legacy.events.iter().map(|e| IdlEventRef {
-                name: e.name.clone(),
-                discriminator: vec![],
-            }).collect(),
+            events: legacy
+                .events
+                .iter()
+                .map(|e| IdlEventRef {
+                    name: e.name.clone(),
+                    discriminator: vec![],
+                })
+                .collect(),
             errors: legacy.errors,
         }
     }
@@ -238,7 +221,7 @@ impl From<LegacyInstruction> for IdlInstruction {
     fn from(legacy: LegacyInstruction) -> Self {
         IdlInstruction {
             name: legacy.name,
-            discriminator: vec![], // Legacy doesn't have discriminators
+            discriminator: vec![],
             accounts: legacy
                 .accounts
                 .into_iter()
@@ -288,9 +271,9 @@ impl From<LegacyEnumVariant> for IdlEnumVariant {
     fn from(legacy: LegacyEnumVariant) -> Self {
         IdlEnumVariant {
             name: legacy.name,
-            fields: legacy.fields.map(|fields| {
-                IdlEnumFields::Named(fields.into_iter().map(Into::into).collect())
-            }),
+            fields: legacy
+                .fields
+                .map(|fields| IdlEnumFields::Named(fields.into_iter().map(Into::into).collect())),
         }
     }
 }
@@ -308,7 +291,6 @@ impl From<LegacyType> for IdlType {
     fn from(legacy: LegacyType) -> Self {
         match legacy {
             LegacyType::Primitive(s) => {
-                // Normalize publicKey -> pubkey
                 if s == "publicKey" {
                     IdlType::Primitive("pubkey".to_string())
                 } else {

@@ -5,10 +5,10 @@ use std::str::FromStr;
 use periscope::cli::{Cli, Commands, ConfigCommands, IdlSource};
 use periscope::config::Config;
 use periscope::display::{
-    display_error, display_idl_overview, display_instruction_detail,
-    display_instruction_not_found, display_instructions_list, display_errors_list,
+    display_error, display_errors_list, display_idl_overview, display_instruction_detail,
+    display_instruction_not_found, display_instructions_list,
 };
-use periscope::idl::{load_idl_from_file, fetch_idl_from_url, fetch_idl_from_chain, Idl};
+use periscope::idl::{fetch_idl_from_chain, fetch_idl_from_url, load_idl_from_file, Idl};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,50 +26,40 @@ async fn main() -> Result<()> {
 
 async fn run(cli: Cli) -> Result<()> {
     match &cli.command {
-        Commands::Inspect { program_id } => {
-            cmd_inspect(&cli, program_id.as_deref()).await
-        }
+        Commands::Inspect { program_id } => cmd_inspect(&cli, program_id.as_deref()).await,
         Commands::Instructions { program_id } => {
             cmd_instructions(&cli, program_id.as_deref()).await
         }
         Commands::Instruction { name, program_id } => {
             cmd_instruction(&cli, program_id.as_deref(), name).await
         }
-        Commands::Errors { program_id } => {
-            cmd_errors(&cli, program_id.as_deref()).await
-        }
-        Commands::Config { action } => {
-            cmd_config(action.clone())
-        }
+        Commands::Errors { program_id } => cmd_errors(&cli, program_id.as_deref()).await,
+        Commands::Config { action } => cmd_config(action.clone()),
     }
 }
 
-// ============================================================================
-// Command handlers
-// ============================================================================
-
-/// Handle `inspect` command - show full IDL overview
+/// Handle `inspect` command
 async fn cmd_inspect(cli: &Cli, program_id: Option<&str>) -> Result<()> {
     let idl = fetch_idl(cli, program_id).await?;
     display_idl_overview(&idl);
     Ok(())
 }
 
-/// Handle `instructions` command - list all instructions
+/// Handle `instructions` command
 async fn cmd_instructions(cli: &Cli, program_id: Option<&str>) -> Result<()> {
     let idl = fetch_idl(cli, program_id).await?;
     display_instructions_list(&idl);
     Ok(())
 }
 
-/// Handle `instruction` command - show specific instruction details
+/// Handle `instruction` command
 async fn cmd_instruction(cli: &Cli, program_id: Option<&str>, name: &str) -> Result<()> {
     let idl = fetch_idl(cli, program_id).await?;
 
-    // Find the instruction by name (case-insensitive)
-    let instruction = idl.instructions.iter().find(|ix| {
-        ix.name.eq_ignore_ascii_case(name)
-    });
+    let instruction = idl
+        .instructions
+        .iter()
+        .find(|ix| ix.name.eq_ignore_ascii_case(name));
 
     match instruction {
         Some(ix) => {
@@ -84,14 +74,13 @@ async fn cmd_instruction(cli: &Cli, program_id: Option<&str>, name: &str) -> Res
     }
 }
 
-/// Handle `errors` command - list all error codes
+/// Handle `errors` command
 async fn cmd_errors(cli: &Cli, program_id: Option<&str>) -> Result<()> {
     let idl = fetch_idl(cli, program_id).await?;
     display_errors_list(&idl);
     Ok(())
 }
 
-/// Handle `config` subcommands
 fn cmd_config(action: ConfigCommands) -> Result<()> {
     match action {
         ConfigCommands::Show => {
@@ -102,7 +91,10 @@ fn cmd_config(action: ConfigCommands) -> Result<()> {
             println!();
             println!("Periscope Configuration:");
             println!("  Config file: {}", config_path.display());
-            println!("  File exists: {}", if exists { "yes" } else { "no (using defaults)" });
+            println!(
+                "  File exists: {}",
+                if exists { "yes" } else { "no (using defaults)" }
+            );
             println!();
             println!("  RPC URL: {}", config.rpc_url);
             println!();
@@ -110,16 +102,9 @@ fn cmd_config(action: ConfigCommands) -> Result<()> {
         }
         ConfigCommands::Set { url } => {
             if let Some(url) = url {
-                // Load existing config or defaults
                 let mut config = Config::load()?;
-
-                // Update the RPC URL
                 config.rpc_url = url.clone();
-
-                // Validate before saving
                 config.validate()?;
-
-                // Save to file
                 config.save()?;
 
                 let config_path = Config::file_path()?;
@@ -134,30 +119,19 @@ fn cmd_config(action: ConfigCommands) -> Result<()> {
     }
 }
 
-// ============================================================================
-// Helper functions
-// ============================================================================
-
-/// Fetch IDL from the appropriate source
-///
-/// - If --idl is provided: load from file/URL (program_id not required)
-/// - If --idl is not provided: fetch on-chain (program_id required)
 async fn fetch_idl(cli: &Cli, program_id: Option<&str>) -> Result<Idl> {
     let source = cli.idl_source();
 
     match source {
         IdlSource::File(path) => {
-            // Load from local file - program_id not needed
             let idl = load_idl_from_file(&path)?;
             Ok(idl)
         }
         IdlSource::Url(url) => {
-            // Fetch from URL - program_id not needed
             let idl = fetch_idl_from_url(&url).await?;
             Ok(idl)
         }
         IdlSource::OnChain => {
-            // Fetch on-chain - program_id required
             let program_id_str = program_id.ok_or_else(|| {
                 anyhow!("Program ID is required when fetching on-chain. Use --idl to load from file/URL instead.")
             })?;
@@ -172,7 +146,6 @@ async fn fetch_idl(cli: &Cli, program_id: Option<&str>) -> Result<Idl> {
     }
 }
 
-/// Get RPC URL from --url flag or config
 fn get_rpc_url(cli: &Cli) -> String {
     match &cli.url {
         Some(url) => url.clone(),
