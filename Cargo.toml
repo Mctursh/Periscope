@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "CLI tool to explore and query Anchor program IDLs on-chain"
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/Mctursh/Periscope"
 keywords = ["solana", "anchor", "idl", "cli"]
 categories = ["command-line-utilities", "development-tools"]
