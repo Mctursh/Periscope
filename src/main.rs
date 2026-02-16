@@ -2,13 +2,13 @@ use anyhow::{anyhow, Result};
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
-use periscope::cli::{Cli, Commands, ConfigCommands};
+use periscope::cli::{Cli, Commands, ConfigCommands, IdlSource};
 use periscope::config::Config;
 use periscope::display::{
     display_error, display_idl_overview, display_instruction_detail,
     display_instruction_not_found, display_instructions_list, display_errors_list,
 };
-use periscope::idl::load_idl;
+use periscope::idl::{load_idl_from_file, fetch_idl_from_url, fetch_idl_from_chain, Idl};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -27,16 +27,16 @@ async fn main() -> Result<()> {
 async fn run(cli: Cli) -> Result<()> {
     match &cli.command {
         Commands::Inspect { program_id } => {
-            cmd_inspect(&cli, program_id).await
+            cmd_inspect(&cli, program_id.as_deref()).await
         }
         Commands::Instructions { program_id } => {
-            cmd_instructions(&cli, program_id).await
+            cmd_instructions(&cli, program_id.as_deref()).await
         }
-        Commands::Instruction { program_id, name } => {
-            cmd_instruction(&cli, program_id, name).await
+        Commands::Instruction { name, program_id } => {
+            cmd_instruction(&cli, program_id.as_deref(), name).await
         }
         Commands::Errors { program_id } => {
-            cmd_errors(&cli, program_id).await
+            cmd_errors(&cli, program_id.as_deref()).await
         }
         Commands::Config { action } => {
             cmd_config(action.clone())
@@ -49,33 +49,22 @@ async fn run(cli: Cli) -> Result<()> {
 // ============================================================================
 
 /// Handle `inspect` command - show full IDL overview
-async fn cmd_inspect(cli: &Cli, program_id_str: &str) -> Result<()> {
-    let (program_id, rpc_url) = prepare_fetch(cli, program_id_str)?;
-    let source = cli.idl_source();
-
-    let idl = load_idl(source, &program_id, &rpc_url).await?;
-
+async fn cmd_inspect(cli: &Cli, program_id: Option<&str>) -> Result<()> {
+    let idl = fetch_idl(cli, program_id).await?;
     display_idl_overview(&idl);
     Ok(())
 }
 
 /// Handle `instructions` command - list all instructions
-async fn cmd_instructions(cli: &Cli, program_id_str: &str) -> Result<()> {
-    let (program_id, rpc_url) = prepare_fetch(cli, program_id_str)?;
-    let source = cli.idl_source();
-
-    let idl = load_idl(source, &program_id, &rpc_url).await?;
-
+async fn cmd_instructions(cli: &Cli, program_id: Option<&str>) -> Result<()> {
+    let idl = fetch_idl(cli, program_id).await?;
     display_instructions_list(&idl);
     Ok(())
 }
 
 /// Handle `instruction` command - show specific instruction details
-async fn cmd_instruction(cli: &Cli, program_id_str: &str, name: &str) -> Result<()> {
-    let (program_id, rpc_url) = prepare_fetch(cli, program_id_str)?;
-    let source = cli.idl_source();
-
-    let idl = load_idl(source, &program_id, &rpc_url).await?;
+async fn cmd_instruction(cli: &Cli, program_id: Option<&str>, name: &str) -> Result<()> {
+    let idl = fetch_idl(cli, program_id).await?;
 
     // Find the instruction by name (case-insensitive)
     let instruction = idl.instructions.iter().find(|ix| {
@@ -96,12 +85,8 @@ async fn cmd_instruction(cli: &Cli, program_id_str: &str, name: &str) -> Result<
 }
 
 /// Handle `errors` command - list all error codes
-async fn cmd_errors(cli: &Cli, program_id_str: &str) -> Result<()> {
-    let (program_id, rpc_url) = prepare_fetch(cli, program_id_str)?;
-    let source = cli.idl_source();
-
-    let idl = load_idl(source, &program_id, &rpc_url).await?;
-
+async fn cmd_errors(cli: &Cli, program_id: Option<&str>) -> Result<()> {
+    let idl = fetch_idl(cli, program_id).await?;
     display_errors_list(&idl);
     Ok(())
 }
@@ -153,20 +138,47 @@ fn cmd_config(action: ConfigCommands) -> Result<()> {
 // Helper functions
 // ============================================================================
 
-/// Parse program ID and determine RPC URL
-fn prepare_fetch(cli: &Cli, program_id_str: &str) -> Result<(Pubkey, String)> {
-    // Parse program ID
-    let program_id = Pubkey::from_str(program_id_str)
-        .map_err(|_| anyhow!("Invalid program ID: {}", program_id_str))?;
+/// Fetch IDL from the appropriate source
+///
+/// - If --idl is provided: load from file/URL (program_id not required)
+/// - If --idl is not provided: fetch on-chain (program_id required)
+async fn fetch_idl(cli: &Cli, program_id: Option<&str>) -> Result<Idl> {
+    let source = cli.idl_source();
 
-    // Determine RPC URL priority: --url flag > config file > default
-    let rpc_url = match &cli.url {
+    match source {
+        IdlSource::File(path) => {
+            // Load from local file - program_id not needed
+            let idl = load_idl_from_file(&path)?;
+            Ok(idl)
+        }
+        IdlSource::Url(url) => {
+            // Fetch from URL - program_id not needed
+            let idl = fetch_idl_from_url(&url).await?;
+            Ok(idl)
+        }
+        IdlSource::OnChain => {
+            // Fetch on-chain - program_id required
+            let program_id_str = program_id.ok_or_else(|| {
+                anyhow!("Program ID is required when fetching on-chain. Use --idl to load from file/URL instead.")
+            })?;
+
+            let pubkey = Pubkey::from_str(program_id_str)
+                .map_err(|_| anyhow!("Invalid program ID: {}", program_id_str))?;
+
+            let rpc_url = get_rpc_url(cli);
+            let idl = fetch_idl_from_chain(&pubkey, &rpc_url)?;
+            Ok(idl)
+        }
+    }
+}
+
+/// Get RPC URL from --url flag or config
+fn get_rpc_url(cli: &Cli) -> String {
+    match &cli.url {
         Some(url) => url.clone(),
         None => {
             let config = Config::load().unwrap_or_default();
             config.rpc_url
         }
-    };
-
-    Ok((program_id, rpc_url))
+    }
 }

@@ -5,23 +5,22 @@ Fetch and query Anchor program IDLs from Solana.
 ## Install
 
 ```bash
-cargo install --path .
+cargo install anchor-periscope
 ```
 
 ## Commands
 
 ```bash
-# Program overview
+# On-chain (requires program ID)
 periscope inspect <PROGRAM_ID>
-
-# List all instructions
 periscope instructions <PROGRAM_ID>
-
-# Instruction details (accounts, args, discriminator)
-periscope instruction <PROGRAM_ID> <NAME>
-
-# List error codes
+periscope instruction <NAME> <PROGRAM_ID>
 periscope errors <PROGRAM_ID>
+
+# From file or URL (program ID not needed)
+periscope inspect --idl ./target/idl/program.json
+periscope instructions --idl https://github.com/user/repo/blob/main/idl.json
+periscope inspect --idl ./idl.json 
 ```
 
 ## Options
@@ -30,24 +29,21 @@ periscope errors <PROGRAM_ID>
 # Custom RPC
 periscope --url https://my-rpc.com inspect <PROGRAM_ID>
 
-# Load from file instead of chain
-periscope --idl ./target/idl/program.json inspect <PROGRAM_ID>
+# Load from file (no program ID needed)
+periscope --idl ./idl.json inspect
 
-# Load from URL (GitHub blob URLs auto-convert to raw)
-periscope --idl https://github.com/user/repo/blob/main/idl.json inspect <PROGRAM_ID>
+# Load from URL - GitHub blob URLs auto-convert to raw
+periscope --idl https://github.com/user/repo/blob/main/idl.json inspect
 ```
 
 ## Config
 
-Config file location depends on OS:
+Config file location:
 - Linux: `~/.config/periscope/config.toml`
 - macOS: `~/Library/Application Support/periscope/config.toml`
 
 ```bash
-# Show current config
 periscope config show
-
-# Set default RPC
 periscope config set --url https://api.devnet.solana.com
 ```
 
@@ -56,16 +52,17 @@ RPC priority: `--url` flag > config file > mainnet-beta default
 ## Library
 
 ```rust
-use periscope::fetch_idl_from_chain;
+use periscope::{fetch_idl_from_chain, load_idl_from_file};
 use solana_sdk::pubkey::Pubkey;
 
+// From chain
 let program_id: Pubkey = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".parse()?;
 let idl = fetch_idl_from_chain(&program_id, "https://api.mainnet-beta.solana.com")?;
 
+// From file
+let idl = load_idl_from_file("./target/idl/my_program.json")?;
+
 println!("{}", idl.metadata.name);
-for ix in &idl.instructions {
-    println!("  {}", ix.name);
-}
 ```
 
 Functions:
@@ -75,17 +72,12 @@ Functions:
 - `fetch_idl_from_url(url)` - Fetch from URL (async)
 - `get_idl_address(program_id)` - Derive IDL account address
 
-## Requirements
+## Supported Formats
 
-- Anchor programs only
-- IDL must be published on-chain (`anchor idl init` / `anchor idl upgrade`)
 - Anchor IDL spec 0.1.0+ (Anchor 0.29+)
+- Legacy Anchor IDL (pre-0.29)
 
-<!-- ## TODO
-
-- [ ] IDL caching
-- [ ] Older Anchor IDL formats
-- [ ] Interactive mode -->
+Format is auto-detected.
 
 ## License
 

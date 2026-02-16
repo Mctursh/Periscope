@@ -51,29 +51,29 @@ fn normalize_github_url(url: &str) -> String {
 pub enum Commands {
     /// Show full IDL overview for a program
     Inspect {
-        /// Program ID (base58)
-        program_id: String,
+        /// Program ID (base58) - required for on-chain, optional with --idl
+        program_id: Option<String>,
     },
 
     /// List all instructions in the program
     Instructions {
-        /// Program ID (base58)
-        program_id: String,
+        /// Program ID (base58) - required for on-chain, optional with --idl
+        program_id: Option<String>,
     },
 
     /// Show details for a specific instruction
     Instruction {
-        /// Program ID (base58)
-        program_id: String,
-
         /// Instruction name
         name: String,
+
+        /// Program ID (base58) - required for on-chain, optional with --idl
+        program_id: Option<String>,
     },
 
     /// List all error codes defined by the program
     Errors {
-        /// Program ID (base58)
-        program_id: String,
+        /// Program ID (base58) - required for on-chain, optional with --idl
+        program_id: Option<String>,
     },
 
     /// Manage Periscope configuration
